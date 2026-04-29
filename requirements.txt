@@ -1,0 +1,29 @@
+# Core AI & Orchestration
+langchain>=0.1.0
+langgraph>=0.0.10
+langchain-anthropic>=0.1.0
+langchain-pinecone>=0.1.0
+langchain-community>=0.0.10
+langchain-openai>=0.1.0
+
+# API Clients
+anthropic>=0.20.0
+openai>=1.0.0
+pinecone-client>=3.0.0
+yfinance>=0.2.0
+
+# Backend Server
+fastapi>=0.110.0
+uvicorn>=0.27.0
+
+# RAG & Document Processing
+pypdf>=4.0.0
+tiktoken>=0.6.0
+
+# Observability
+langfuse>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+pydantic>=2.0.0
+requests>=2.31.0
