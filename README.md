@@ -16,7 +16,7 @@ A production-grade AI finance assistant built with **Claude API**, **LangGraph**
 - **LLM Observability** — Every Claude call traced and monitored via LangFuse dashboard
 - **Conversational Memory** — LangChain memory maintains context across the conversation
 - **Modern UI** — React + TypeScript frontend with real-time streaming responses
-- **(Optional) Persistent Memory** — Mem0 integration for cross-session user memory
+- **(Future) Persistent Memory** — Mem0 integration for cross-session user memory
 
 ---
 
@@ -31,7 +31,7 @@ A production-grade AI finance assistant built with **Claude API**, **LangGraph**
 | Backend | FastAPI + Uvicorn |
 | Frontend | React + TypeScript |
 | Language | Python 3.11+ / Node.js 18+ |
-| Optional Memory | Mem0 |
+| Future Memory | Mem0 |
 
 ---
 
@@ -70,7 +70,7 @@ finsight/
 │   │   ├── __init__.py
 │   │   └── langfuse_client.py      # LangFuse tracing setup
 │   │
-│   ├── memory/                     # Optional — Mem0 integration
+│   ├── memory/                     # Future — Mem0 integration
 │   │   ├── __init__.py
 │   │   └── mem0_client.py
 │   │
@@ -271,7 +271,7 @@ vercel deploy
 - [x] LangFuse observability
 - [x] React + TypeScript frontend
 - [x] FastAPI streaming backend
-- [ ] Mem0 persistent memory (optional)
+- [ ] Mem0 persistent memory (Future)
 - [ ] PDF upload via UI
 - [ ] Multi-currency support
 
