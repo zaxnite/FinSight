@@ -1,0 +1,41 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #0a0c0f;
+  --bg-surface: #111418;
+  --bg-elevated: #181c22;
+  --bg-hover: #1e242d;
+  --border: #1f2733;
+  --border-light: #2a3340;
+  --accent: #00c07f;
+  --accent-dim: #00c07f22;
+  --accent-hover: #00d98f;
+  --red: #ff4d4d;
+  --yellow: #f5c842;
+  --text-primary: #e8edf2;
+  --text-secondary: #6b7a8d;
+  --text-muted: #3d4f63;
+  --font-display: 'Syne', sans-serif;
+  --font-mono: 'DM Mono', monospace;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --transition: 0.18s ease;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+
+::selection { background: var(--accent-dim); color: var(--accent); }
