@@ -2,6 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
+import json
 from dotenv import load_dotenv
 from pinecone import Pinecone
 from langchain_community.document_loaders import PyPDFLoader
@@ -12,13 +13,27 @@ from rag.embeddings import get_embeddings
 load_dotenv()
 
 DOCS_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "docs")
+INGESTED_LOG = os.path.join(os.path.dirname(__file__), "..", "data", "ingested.json")
 CHUNK_SIZE = 512
 CHUNK_OVERLAP = 64
 BATCH_SIZE = 50
 
 
-def load_pdfs(docs_path: str) -> list:
+def load_ingested_log() -> set:
+    if os.path.exists(INGESTED_LOG):
+        with open(INGESTED_LOG, "r") as f:
+            return set(json.load(f))
+    return set()
+
+
+def save_ingested_log(ingested: set) -> None:
+    with open(INGESTED_LOG, "w") as f:
+        json.dump(list(ingested), f, indent=2)
+
+
+def load_pdfs(docs_path: str, already_ingested: set) -> tuple[list, list]:
     documents = []
+    new_files = []
     pdf_files = [f for f in os.listdir(docs_path) if f.endswith(".pdf")]
 
     if not pdf_files:
@@ -26,15 +41,20 @@ def load_pdfs(docs_path: str) -> list:
         sys.exit(1)
 
     for filename in pdf_files:
+        if filename in already_ingested:
+            print(f"  ⏭️  Skipping (already ingested): {filename}")
+            continue
+
         filepath = os.path.join(docs_path, filename)
         loader = PyPDFLoader(filepath)
         pages = loader.load()
         for page in pages:
             page.metadata["source"] = filename
         documents.extend(pages)
+        new_files.append(filename)
         print(f"  📄 Loaded: {filename} ({len(pages)} pages)")
 
-    return documents
+    return documents, new_files
 
 
 def split_documents(documents: list) -> list:
@@ -59,8 +79,14 @@ def ingest():
         print(f"❌ Index '{index_name}' not found in Pinecone. Create it first.")
         sys.exit(1)
 
+    already_ingested = load_ingested_log()
+
     print("📂 Loading PDFs...")
-    documents = load_pdfs(DOCS_PATH)
+    documents, new_files = load_pdfs(DOCS_PATH, already_ingested)
+
+    if not documents:
+        print("\n✅ Nothing new to ingest — all files already in Pinecone.")
+        return
 
     print("\n✂️  Splitting documents...")
     chunks = split_documents(documents)
@@ -86,7 +112,11 @@ def ingest():
 
         time.sleep(3)
 
-    print(f"\n✅ Ingestion complete — {len(chunks)} chunks uploaded to '{index_name}'")
+    already_ingested.update(new_files)
+    save_ingested_log(already_ingested)
+
+    print(f"\n✅ Ingestion complete — {len(chunks)} new chunks uploaded to '{index_name}'")
+    print(f"📋 Total ingested files: {len(already_ingested)}")
     return vectorstore
 
 

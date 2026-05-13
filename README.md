@@ -31,7 +31,7 @@ A production-grade AI finance assistant built with **Claude API**, **LangGraph**
 | Backend | FastAPI + Uvicorn |
 | Frontend | React + TypeScript |
 | Language | Python 3.11+ / Node.js 18+ |
-| Future Memory | Mem0 |
+| Future Implementation | Mem0 |
 
 ---
 
@@ -280,5 +280,5 @@ vercel deploy
 ## 👤 Author
 
 **Aathif Khan** — AI Engineer  
-[LinkedIn](https://linkedin.com/in/yourprofile) · [GitHub](https://github.com/yourusername)  
+[LinkedIn](https://www.linkedin.com/in/aathif-khan-042214201/) · [GitHub](https://github.com/zaxnite)  
 Dubai, UAE

@@ -23,6 +23,7 @@ export interface Message {
 export interface Conversation {
   id: string;
   title: string;
+  starred: boolean;
   messages: Message[];
   createdAt: Date;
 }

@@ -7,6 +7,8 @@ from structured.output_schema import FinanceResponse
 class AgentState(BaseModel):
     messages: Annotated[list, add_messages] = []
     session_id: str = ""
+    blocked: bool = False
+    blocked_message: str = ""
     tool_to_use: Literal["doc_search", "stock_price", "budget_calc", "none"] = "none"
     tool_input: str = ""
     tool_output: str = ""

@@ -1,27 +1,32 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg-base: #0a0c0f;
-  --bg-surface: #111418;
-  --bg-elevated: #181c22;
-  --bg-hover: #1e242d;
-  --border: #1f2733;
-  --border-light: #2a3340;
-  --accent: #00c07f;
-  --accent-dim: #00c07f22;
-  --accent-hover: #00d98f;
-  --red: #ff4d4d;
-  --yellow: #f5c842;
-  --text-primary: #e8edf2;
-  --text-secondary: #6b7a8d;
-  --text-muted: #3d4f63;
-  --font-display: 'Syne', sans-serif;
+  --bg-base: #080B10;
+  --bg-surface: #0E1117;
+  --bg-elevated: #151B24;
+  --bg-hover: #1A2233;
+  --border: #1E2A3A;
+  --border-light: #243044;
+  --accent: #00D084;
+  --accent-dim: #00D08415;
+  --accent-hover: #00E892;
+  --cyan: #00B8D9;
+  --cyan-dim: #00B8D915;
+  --red: #FF4757;
+  --amber: #FFB300;
+  --text-primary: #F0F4F8;
+  --text-secondary: #8899AA;
+  --text-muted: #445566;
+  --font: 'Outfit', sans-serif;
   --font-mono: 'DM Mono', monospace;
-  --radius: 10px;
-  --radius-sm: 6px;
-  --transition: 0.18s ease;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --transition: 0.15s ease;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --glow: 0 0 20px rgba(0, 208, 132, 0.2);
 }
 
 html, body, #root { height: 100%; }
@@ -29,7 +34,9 @@ html, body, #root { height: 100%; }
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-display);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -37,5 +44,20 @@ body {
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 ::selection { background: var(--accent-dim); color: var(--accent); }
+
+a { color: inherit; text-decoration: none; }
+button { cursor: pointer; font-family: var(--font); }
+
+input, textarea {
+  font-family: var(--font);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--text-muted);
+  font-size: 14px;
+}
