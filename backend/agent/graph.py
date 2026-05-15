@@ -9,7 +9,7 @@ from langgraph.graph import StateGraph, END
 from langchain_core.messages import HumanMessage
 from agent.state import AgentState
 from agent.nodes import guardrail_node, reasoner_node, tool_node, responder_node
-from observability.langfuse_client import get_langfuse_config, trace_request
+from observability.langfuse_client import get_langfuse_config, flush
 from structured.output_schema import AgentOutput, FinanceResponse
 
 
@@ -56,7 +56,6 @@ def run_graph(message: str, session_id: str) -> AgentOutput:
     result = app.invoke(initial_state, config=langfuse_config)
     final_state = AgentState(**result)
 
-    # If blocked by guardrail, return a clean response
     if final_state.blocked:
         blocked_response = FinanceResponse(
             advice=final_state.blocked_message,
@@ -74,13 +73,6 @@ def run_graph(message: str, session_id: str) -> AgentOutput:
             tool_used="none",
             session_id=session_id,
         )
-
-    trace_request(
-        session_id=session_id,
-        user_message=message,
-        tool_used=final_state.tool_to_use,
-        response_summary=final_state.final_response.advice[:100] if final_state.final_response else "",
-    )
 
     return AgentOutput(
         response=final_state.final_response,

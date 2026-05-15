@@ -85,6 +85,7 @@ export const useChat = () => {
     activeConversation,
     activeId,
     loading,
+    setLoading,
     error,
     send,
     newConversation,
