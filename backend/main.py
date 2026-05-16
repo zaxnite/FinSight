@@ -8,7 +8,10 @@ load_dotenv()
 import uuid
 import json
 import traceback
+import time
 from contextlib import asynccontextmanager
+
+START_TIME = time.time()
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -95,7 +98,28 @@ class ScoreRequest(BaseModel):
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "FinSight API"}
+    uptime_seconds = int(time.time() - START_TIME)
+    hours, remainder = divmod(uptime_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    uptime_str = f"{hours}h {minutes}m {seconds}s"
+
+    # Count indexed docs from ingested.json
+    docs_indexed = 0
+    try:
+        ingested_log = os.path.join(os.path.dirname(__file__), "data", "ingested.json")
+        if os.path.exists(ingested_log):
+            with open(ingested_log) as f:
+                docs_indexed = len(json.load(f))
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "version": "1.0.0",
+        "model": "claude-haiku-4-5-20251001",
+        "docs_indexed": docs_indexed,
+        "uptime": uptime_str,
+    }
 
 
 @app.post("/score")

@@ -325,8 +325,8 @@ export default function LandingPage() {
         {/* Stats */}
         <div style={{ ...fade(550), display: "flex", borderRadius: "14px", overflow: "hidden", border: "1px solid #1E2A3A" }}>
           {[
-            { value: 1733, suffix: "+", label: "Vector Embeddings" },
-            { value: 8, suffix: "", label: "UAE financial sources" },
+            { value: 2500, suffix: "+", label: "Vector Embeddings" },
+            { value: 12, suffix: "", label: "UAE financial sources" },
             { value: 3, suffix: "", label: "AI-powered tools" },
           ].map((stat, i) => (
             <div key={i} style={{

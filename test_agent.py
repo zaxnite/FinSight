@@ -1,17 +1,8 @@
-import sys
-sys.path.append("backend")
+from pinecone import Pinecone
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
-from backend.agent.graph import run_graph
-import uuid
-
-result = run_graph(
-    message="What is the 50/30/20 budgeting rule?",
-    session_id=str(uuid.uuid4())
-)
-
-print("Tool used:", result.tool_used)
-print("Advice:", result.response.advice)
-print("Confidence:", result.response.confidence)
-print("Risk:", result.response.risk_level)
-print("Sources:", result.response.sources)
-print("Follow-up:", result.response.follow_up)
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index = pc.Index(os.getenv("PINECONE_INDEX_NAME", "finsight"))
+print(index.describe_index_stats())

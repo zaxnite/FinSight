@@ -7,6 +7,7 @@ import type { AgentOutput } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+
 const scoreResponse = async (session_id: string, value: number) => {
   try {
     await fetch(`${BASE_URL}/score`, {
@@ -37,6 +38,58 @@ const riskColor: Record<string, string> = {
   low: "#00D084",
   medium: "#FFB300",
   high: "#FF4757",
+};
+
+// ── Source descriptions ───────────────────────────────────────────────────────
+const SOURCE_DESCRIPTIONS: Record<string, { title: string; desc: string }> = {
+  "CBUAE_Guidance_Note_AI_ML_Consumer_Protection_LFIs.pdf": {
+    title: "CBUAE AI/ML Guidance Note",
+    desc: "Central Bank principles for responsible, ethical AI & ML use by licensed financial institutions to protect consumers.",
+  },
+  "CBUAE_Consumer_Protection_Standards_Circular_8-2020.pdf": {
+    title: "CBUAE Consumer Protection Standards",
+    desc: "Detailed standards mandating disclosure, fair business conduct, data protection, and complaint resolution for UAE financial institutions.",
+  },
+  "Baker-McKenzie-Doing-Business-UAE-Guide-2025.pdf": {
+    title: "Doing Business in UAE 2025",
+    desc: "Practical legal guide covering corporate structures, taxation, employment, and compliance for businesses in the UAE.",
+  },
+  "CBUAE_Consumer_Protection_Regulation_Circular_8-2020_Bilingual.pdf": {
+    title: "CBUAE Consumer Protection Regulation",
+    desc: "Foundational bilingual regulation establishing the UAE's consumer protection framework for financial services.",
+  },
+  "CBUAE_Financial_Stability_Report_2024_EN.pdf": {
+    title: "CBUAE Financial Stability Report 2024",
+    desc: "Central Bank annual assessment of UAE macro-financial resilience, banking health, and emerging risk responses.",
+  },
+  "SEC-Student-Guide-Saving-Investing-Basics.pdf": {
+    title: "SEC Student Guide: Saving & Investing",
+    desc: "Beginner-friendly U.S. SEC resource on budgeting, saving, investing fundamentals, and investor protection.",
+  },
+  "SEC-Investor-Roadmap-Financial-Security-Saving-Investing.pdf": {
+    title: "SEC Investor Roadmap",
+    desc: "Step-by-step SEC guide to achieving financial security through informed saving, investing, and risk management.",
+  },
+  "Pannike-Partners-UAE-Investment-Guide-2025.pdf": {
+    title: "UAE Investment Guide 2025",
+    desc: "Legal and regulatory overview for foreign investors in the UAE — free zones, business structures, and sector compliance.",
+  },
+  "DLA-Piper-UAE-Investment-Rules-Guide-Jan-2020.pdf": {
+    title: "DLA Piper UAE Investment Rules",
+    desc: "Reference on UAE capital markets, debt securities, fund structures, lending, and FinTech compliance for institutional investors.",
+  },
+  "PWC-UAE-SCA-Corporate-Governance-Amendments-Analysis-2024.pdf": {
+    title: "PwC: SCA Governance Amendments 2024",
+    desc: "Expert breakdown of SCA's 2024 governance reforms — internal controls, audit committee duties, and compliance for listed companies.",
+  },
+  "UAE_Federal_Budget_Yearbook_2026_Community_Edition_Investing_in_People.pdf": {
+    title: "UAE Federal Budget Yearbook 2026",
+    desc: "UAE's 2026 budget strategy detailing investments in education, healthcare, infrastructure, and social programs.",
+  },
+  "UAE-FTA-Corporate-Tax-Guide-Investment-Funds-Managers-May-2024.pdf": {
+    title: "FTA Corporate Tax Guide – Investment Funds",
+    desc: "Official UAE Federal Tax Authority guidance on Corporate Tax for investment funds, REIT rules, and the Investment Manager Exemption.",
+  },
 };
 
 const suggestions = [
@@ -156,8 +209,7 @@ const DeleteModal = ({ title, onConfirm, onClose }: {
   </Modal>
 );
 
-// ── ResponseCard ──────────────────────────────────────────────────────────────
-// ── Tooltip ───────────────────────────────────────────────────────────────────
+// ── Tooltip (generic) ─────────────────────────────────────────────────────────
 const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }) => {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
@@ -203,6 +255,104 @@ const Tooltip = ({ text, children }: { text: string; children: React.ReactNode }
         </div>
       )}
     </div>
+  );
+};
+
+// ── Source chip with rich tooltip ─────────────────────────────────────────────
+const SourceChip = ({ src }: { src: string }) => {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const ref = useRef<HTMLAnchorElement>(null);
+
+  const meta = SOURCE_DESCRIPTIONS[src];
+
+  const handleEnter = () => {
+    if (ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      // Position above the chip, centred
+      setPos({ x: rect.left + rect.width / 2, y: rect.top });
+    }
+    setShow(true);
+  };
+
+  return (
+    <>
+      <a
+        ref={ref}
+        href={`${BASE_URL}/docs-files/${encodeURIComponent(src)}`}
+        target="_blank"
+        rel="noreferrer"
+        onMouseEnter={handleEnter}
+        onMouseLeave={() => setShow(false)}
+        style={{
+          fontSize: "10px", color: "var(--text-muted)",
+          background: "var(--bg-elevated)", border: "1px solid var(--border)",
+          padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)",
+          textDecoration: "none", cursor: "pointer", transition: "var(--transition)",
+          display: "inline-block",
+        }}
+        onFocus={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
+        onBlur={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-muted)"; }}
+      >
+        {/* Inline hover styles via onMouse since we can't use CSS classes easily here */}
+        <span
+          onMouseEnter={e => {
+            const a = e.currentTarget.closest("a") as HTMLAnchorElement;
+            if (a) { a.style.borderColor = "var(--accent)"; a.style.color = "var(--accent)"; }
+          }}
+          onMouseLeave={e => {
+            const a = e.currentTarget.closest("a") as HTMLAnchorElement;
+            if (a) { a.style.borderColor = "var(--border)"; a.style.color = "var(--text-muted)"; }
+          }}
+        >
+          📄 {meta ? meta.title : src}
+        </span>
+      </a>
+
+      {/* Rich tooltip rendered via portal-like fixed positioning */}
+      {show && meta && (
+        <div style={{
+          position: "fixed",
+          left: Math.min(pos.x, window.innerWidth - 260),
+          top: pos.y - 10,
+          transform: "translate(-50%, -100%)",
+          background: "#111827",
+          border: "1px solid #00D08440",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          zIndex: 9999,
+          pointerEvents: "none",
+          width: "240px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.7), 0 0 0 1px #00D08420",
+          animation: "fadeIn 0.12s ease",
+        }}>
+          {/* Title */}
+          <div style={{
+            fontSize: "11px", fontWeight: 700,
+            color: "var(--accent)", marginBottom: "5px",
+            fontFamily: "var(--font)", lineHeight: 1.3,
+          }}>
+            {meta.title}
+          </div>
+          {/* Description */}
+          <div style={{
+            fontSize: "10.5px", color: "var(--text-secondary)",
+            lineHeight: 1.6, fontFamily: "var(--font)",
+          }}>
+            {meta.desc}
+          </div>
+          {/* Arrow */}
+          <div style={{
+            position: "absolute", top: "100%", left: "50%",
+            transform: "translateX(-50%)",
+            width: 0, height: 0,
+            borderLeft: "5px solid transparent",
+            borderRight: "5px solid transparent",
+            borderTop: "5px solid #00D08440",
+          }} />
+        </div>
+      )}
+    </>
   );
 };
 
@@ -258,25 +408,16 @@ const ResponseCard = ({ output, onFollowUp }: { output: AgentOutput; onFollowUp:
           </div>
         </Tooltip>
       </div>
+
+      {/* ── Sources with rich hover tooltips ── */}
       {response.sources.length > 0 && (
         <div style={{ padding: "8px 14px", display: "flex", flexWrap: "wrap", gap: "5px", borderBottom: "1px solid var(--border)" }}>
           {response.sources.map((src, i) => (
-            <a key={i}
-              href={`http://localhost:8000/docs-files/${encodeURIComponent(src)}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                fontSize: "10px", color: "var(--text-muted)",
-                background: "var(--bg-elevated)", border: "1px solid var(--border)",
-                padding: "2px 8px", borderRadius: "4px", fontFamily: "var(--font-mono)",
-                textDecoration: "none", cursor: "pointer", transition: "var(--transition)",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.color = "var(--accent)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-muted)"; }}
-            >{src}</a>
+            <SourceChip key={i} src={src} />
           ))}
         </div>
       )}
+
       {response.follow_up.length > 0 && (
         <div style={{ padding: "10px 14px", display: "flex", flexWrap: "wrap", gap: "6px" }}>
           {response.follow_up.map((q, i) => (
@@ -324,14 +465,9 @@ const ResponseCard = ({ output, onFollowUp }: { output: AgentOutput; onFollowUp:
             fontSize: "14px", transition: "var(--transition)",
           }}
           onMouseEnter={e => { if (!scored) e.currentTarget.style.background = "#FF475720"; }}
-          onMouseLeave={e => { if (scored !== 0) e.currentTarget.style.background = "transparent"; }}
+          onMouseLeave={e => { if (!scored && scored !== 0) e.currentTarget.style.background = "transparent"; }}
           title="Not helpful"
         >👎</button>
-        {scored !== null && (
-          <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-            Thanks for the feedback!
-          </span>
-        )}
       </div>
     </div>
   );
