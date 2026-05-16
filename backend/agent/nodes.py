@@ -104,6 +104,7 @@ RULES:
   "high" = advice about individual stocks, active trading, crypto, or leveraged products
   A stock price lookup should reflect the risk of that stock as an investment.
 - For sources, list only the document filenames actually referenced in the context. If no documents were used, return an empty list.
+- IMPORTANT: If the retrieved context does not contain sufficient information to answer the question confidently, set confidence below 0.6 and do NOT fabricate an answer. It is better to be honest about uncertainty than to generate misleading financial advice.
 
 FOLLOW-UP QUESTIONS RULES:
 - Suggest 3 follow-up questions the USER can ask YOU (the AI) to learn more.
@@ -119,9 +120,27 @@ Provide clear, helpful, and actionable financial advice. Be concise and direct.
 Use UAE context where relevant (AED, DFM, ADGM, DIFC, SCA, expat considerations).
 Always use markdown bullet points (- item) not bullet characters. Never use the bullet character.
 Do not use markdown headers. Use bold text where helpful.
-Do not add unnecessary preamble. Get straight to the answer."""
+Do not add unnecessary preamble. Get straight to the answer.
+
+IMPORTANT: If you do not have reliable information to answer the question, say so clearly and honestly.
+Do NOT fabricate financial data, regulations, or statistics. Financial misinformation causes real harm."""
+
+FALLBACK_PROMPT = """You are FinSight, an AI-powered personal finance advisor for UAE residents.
+
+A previous attempt to answer the user's question returned a low confidence score, meaning the initial retrieval did not find sufficient information.
+
+You have been given a broader set of retrieved documents as a second attempt. 
+
+RULES:
+- Answer ONLY from the provided context. Do not fabricate.
+- If the context still does not contain enough information to answer confidently, you MUST say so honestly.
+- Set confidence honestly: above 0.6 only if the context clearly supports the answer.
+- Never invent financial regulations, statistics, or product details.
+- Be direct. If you don't know, say: "I don't have enough information in my knowledge base to answer this accurately. For this topic, I'd recommend checking the SCA website (sca.gov.ae) or consulting a licensed financial advisor in the UAE."
+"""
 
 MEMORY_WINDOW = 6
+CONFIDENCE_THRESHOLD = 0.6
 
 
 def _get_callback(session_id: str = ""):
@@ -230,3 +249,74 @@ def stream_responder(state: AgentState, session_id: str = ""):
         if chunk.content:
             time.sleep(0.015)
             yield chunk.content
+
+
+# ── Confidence Fallback ───────────────────────────────────────────────────────
+def confidence_fallback(question: str, original_tool: str, session_id: str = "") -> dict:
+    """
+    Called when the initial response confidence is below CONFIDENCE_THRESHOLD (0.6).
+
+    Strategy:
+    1. Re-run doc_search with a broader/rephrased query as a second retrieval attempt.
+    2. Ask the LLM to answer using the new context, with strict instructions not to fabricate.
+    3. If the new confidence is still below threshold, return an honest "I don't know" message.
+
+    Returns a dict with: answered (bool), text (str), confidence (float), sources (list).
+    """
+    cb = _get_callback(session_id)
+
+    # Broaden the query by prepending UAE finance context
+    broader_query = f"UAE finance: {question}"
+    try:
+        fallback_context = doc_search.invoke(broader_query)
+    except Exception as e:
+        fallback_context = f"Retrieval failed: {str(e)}"
+
+    fallback_messages = [
+        SystemMessage(content=FALLBACK_PROMPT),
+        HumanMessage(content=(
+            f"User question: {question}\n\n"
+            f"Retrieved context (broader search):\n{fallback_context}\n\n"
+            f"Based ONLY on the above context, answer the question. "
+            f"If the context is insufficient, say so honestly."
+        )),
+    ]
+
+    try:
+        fallback_response: FinanceResponse = responder_llm.invoke(
+            fallback_messages,
+            config={"callbacks": [cb]},
+        )
+
+        if fallback_response.confidence >= CONFIDENCE_THRESHOLD:
+            # Fallback succeeded — return improved answer
+            return {
+                "answered": True,
+                "text": fallback_response.advice,
+                "confidence": fallback_response.confidence,
+                "sources": fallback_response.sources,
+            }
+        else:
+            # Still low confidence — return honest message, don't generate
+            return {
+                "answered": False,
+                "text": (
+                    "I wasn't able to find reliable information in my knowledge base to answer this accurately. "
+                    "For this topic, I'd recommend checking the SCA website (sca.gov.ae), "
+                    "the DIFC or ADGM portals, or consulting a licensed financial advisor in the UAE."
+                ),
+                "confidence": fallback_response.confidence,
+                "sources": [],
+            }
+
+    except Exception as e:
+        print(f"[confidence_fallback error] {e}")
+        return {
+            "answered": False,
+            "text": (
+                "I wasn't able to retrieve sufficient information to answer this question confidently. "
+                "Please try rephrasing, or consult the SCA website (sca.gov.ae) for authoritative guidance."
+            ),
+            "confidence": 0.0,
+            "sources": [],
+        }

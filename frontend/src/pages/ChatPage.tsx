@@ -233,7 +233,7 @@ const ResponseCard = ({ output, onFollowUp }: { output: AgentOutput; onFollowUp:
           </span>
           <Tooltip text={
             response.risk_level === "low"
-              ? "This is safe advice, budgeting, saving, or general knowledge, no risky moves."
+              ? "This is safe advice like budgeting, saving, or general knowledge, no risky moves."
               : response.risk_level === "medium"
               ? "It involves investing money, there is some risk as values can go up or down."
               : "These include stocks, crypto, or active trading. Only invest what you can afford to lose."

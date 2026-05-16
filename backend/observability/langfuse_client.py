@@ -21,13 +21,11 @@ def get_langfuse_callback() -> CallbackHandler:
 
 
 def get_callback(session_id: str = ""):
-    """Create a named parent trace and return its LangChain handler.
-    All LLM calls using this handler will be nested under one clean finsight-request trace."""
-    trace = _langfuse.trace(
-        name="finsight-request",
-        session_id=session_id if session_id else None,
-    )
-    return trace.get_langchain_handler()
+    """Return a LangChain callback handler with session tracking."""
+    handler = CallbackHandler()
+    if session_id:
+        handler.session_id = session_id
+    return handler
 
 
 def get_langfuse_config(session_id: str, user_id: str = "anonymous") -> dict:
@@ -42,7 +40,7 @@ def get_langfuse_config(session_id: str, user_id: str = "anonymous") -> dict:
 
 def score_response(session_id: str, value: float) -> None:
     try:
-        _langfuse.score(
+        _langfuse.create_score(
             name="user_feedback",
             value=value,
             session_id=session_id,
