@@ -2,11 +2,17 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import logging
 import yfinance as yf
 from langchain.tools import tool
 
+# Suppress yfinance noise in terminal logs
+logging.getLogger("yfinance").setLevel(logging.CRITICAL)
+
 # Common name to ticker fallback map for fast lookups
+# UAE stocks use .AE suffix on Yahoo Finance (not .DU)
 TICKER_MAP = {
+    # Global
     "tesla": "TSLA",
     "apple": "AAPL",
     "microsoft": "MSFT",
@@ -17,24 +23,30 @@ TICKER_MAP = {
     "meta": "META",
     "facebook": "META",
     "netflix": "NFLX",
+    # Crypto & Commodities
     "bitcoin": "BTC-USD",
     "ethereum": "ETH-USD",
     "gold": "GC=F",
     "oil": "CL=F",
     "silver": "SI=F",
-    "emirates nbd": "ENBD.DU",
-    "emaar": "EMAAR.DU",
+    # UAE / DFM stocks — Yahoo Finance uses .AE suffix
+    "emirates nbd": "EMIRATESNBD.AE",
+    "enbd": "EMIRATESNBD.AE",
+    "emaar": "EMAAR.AE",
+    "emaar properties": "EMAAR.AE",
     "aramco": "2222.SR",
     "saudi aramco": "2222.SR",
-    "etisalat": "ETISALAT.DU",
-    "e&": "ETISALAT.DU",
-    "aldar": "ALDAR.DU",
-    "dewa": "DEWA.DU",
-    "adnoc": "ADNOCDIST.AD",
-    "first abu dhabi": "FAB.AD",
-    "fab": "FAB.AD",
-    "du": "DU.DU",
-    "air arabia": "AIRARarabia.DU",
+    "etisalat": "ETISALAT.AE",
+    "e&": "ETISALAT.AE",
+    "e and": "ETISALAT.AE",
+    "aldar": "ALDAR.AE",
+    "dewa": "DEWA.AE",
+    "adnoc": "ADNOCDIST.AE",
+    "adnoc distribution": "ADNOCDIST.AE",
+    "first abu dhabi": "FAB.AE",
+    "fab": "FAB.AE",
+    "du telecom": "DU.AE",
+    "air arabia": "AIRARABI.AE",
     "aed": "AEDUSDT",
 }
 
@@ -84,7 +96,7 @@ def resolve_ticker(query: str) -> str:
 def stock_price(query: str) -> str:
     """Fetch the live price, currency, and daily change for any stock, ETF, or cryptocurrency.
     Use this when the user asks about current market prices, stock performance, or cryptocurrency values.
-    Input can be a company name (Tesla, Apple, Emirates NBD) or ticker symbol (TSLA, AAPL, ENBD.DU)."""
+    Input can be a company name (Tesla, Apple, Emirates NBD) or ticker symbol (TSLA, AAPL, EMIRATESNBD.AE)."""
     try:
         ticker_symbol = resolve_ticker(query)
         data = yf.Ticker(ticker_symbol)
@@ -98,7 +110,7 @@ def stock_price(query: str) -> str:
             return (
                 f"Could not retrieve a live price for '{query}' (resolved to: {ticker_symbol}). "
                 f"The market may be closed or the ticker may be incorrect. "
-                f"Try using the official ticker symbol directly (e.g. TSLA for Tesla, AAPL for Apple)."
+                f"Try using the official ticker symbol directly (e.g. EMIRATESNBD.AE, EMAAR.AE, TSLA)."
             )
 
         change = current_price - previous_close
@@ -122,5 +134,5 @@ def stock_price(query: str) -> str:
     except Exception as e:
         return (
             f"Error fetching data for '{query}': {str(e)}. "
-            f"Try using the ticker symbol directly (e.g. TSLA, AAPL, BTC-USD)."
+            f"Try using the ticker symbol directly (e.g. EMIRATESNBD.AE, EMAAR.AE, BTC-USD)."
         )

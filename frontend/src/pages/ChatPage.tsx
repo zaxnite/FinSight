@@ -440,7 +440,7 @@ const ResponseCard = ({ output, onFollowUp }: { output: AgentOutput; onFollowUp:
         display: "flex", alignItems: "center", gap: "10px",
       }}>
         <span style={{ fontSize: "11px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
-          Helpful?
+          Was it helpful?
         </span>
         <button
           onClick={() => !scored && handleScore(1)}

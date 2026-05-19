@@ -5,6 +5,21 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
 load_dotenv()
 
+# ── Startup env var check — fail fast with a clear message ────────────────────
+REQUIRED_ENV_VARS = [
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "PINECONE_API_KEY",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY",
+]
+missing = [var for var in REQUIRED_ENV_VARS if not os.getenv(var)]
+if missing:
+    raise RuntimeError(
+        f"Missing required environment variables: {', '.join(missing)}\n"
+        f"Check your .env file and make sure all keys are set."
+    )
+
 import uuid
 import json
 import traceback
@@ -12,6 +27,7 @@ import time
 from contextlib import asynccontextmanager
 
 START_TIME = time.time()
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
@@ -95,6 +111,16 @@ class ScoreRequest(BaseModel):
     value: float  # 1.0 = thumbs up, 0.0 = thumbs down
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def validate_message(message: str) -> None:
+    """Raise 422 if message is empty or whitespace only."""
+    if not message or not message.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Message cannot be empty."
+        )
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
@@ -103,7 +129,6 @@ def health():
     minutes, seconds = divmod(remainder, 60)
     uptime_str = f"{hours}h {minutes}m {seconds}s"
 
-    # Count indexed docs from ingested.json
     docs_indexed = 0
     try:
         ingested_log = os.path.join(os.path.dirname(__file__), "data", "ingested.json")
@@ -136,6 +161,7 @@ def score(request: Request, body: ScoreRequest):
 @app.post("/chat")
 @limiter.limit("10/minute")
 def chat(request: Request, body: ChatRequest):
+    validate_message(body.message)
     try:
         session_id = body.session_id or str(uuid.uuid4())
         result = run_graph(message=body.message, session_id=session_id)
@@ -147,6 +173,8 @@ def chat(request: Request, body: ChatRequest):
 @app.post("/chat/stream")
 @limiter.limit("10/minute")
 async def chat_stream(request: Request, body: ChatRequest):
+    validate_message(body.message)
+
     session_id = body.session_id or str(uuid.uuid4())
 
     messages = []
@@ -213,23 +241,17 @@ async def chat_stream(request: Request, body: ChatRequest):
                 ]
                 meta = responder_llm.invoke(meta_messages)
 
-                # ── Confidence threshold fallback ─────────────────────────────
-                # If confidence is below 0.6, attempt a broader doc_search retry.
-                # If still low after retry, send an honest "can't answer" message.
                 if meta.confidence < 0.6:
                     fallback_result = confidence_fallback(
                         question=body.message,
                         original_tool=state.tool_to_use,
                         session_id=session_id,
                     )
-
                     if fallback_result["answered"]:
-                        # Stream the improved answer as a correction chunk
                         yield f"data: {json.dumps({'type': 'correction', 'content': fallback_result['text']})}\n\n"
                         meta.confidence = fallback_result["confidence"]
                         meta.sources = fallback_result["sources"]
                     else:
-                        # Not enough information — emit honest low-confidence notice
                         yield f"data: {json.dumps({'type': 'correction', 'content': fallback_result['text']})}\n\n"
                         meta.confidence = fallback_result["confidence"]
                         meta.sources = []
@@ -249,6 +271,8 @@ async def chat_stream(request: Request, body: ChatRequest):
             except Exception:
                 pass
 
+        except HTTPException:
+            raise
         except Exception as e:
             err = traceback.format_exc()
             print(f"[event_stream error] {err}")

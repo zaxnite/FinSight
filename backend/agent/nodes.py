@@ -21,6 +21,8 @@ llm = ChatAnthropic(
     model="claude-haiku-4-5-20251001",
     api_key=os.getenv("ANTHROPIC_API_KEY"),
     max_tokens=1500,
+    timeout=30,      # fail after 30s instead of hanging forever
+    max_retries=2,   # auto-retry twice on transient errors
 )
 
 # ── Structured output schemas ─────────────────────────────────────────────────
@@ -51,6 +53,8 @@ streaming_llm = ChatAnthropic(
     api_key=os.getenv("ANTHROPIC_API_KEY"),
     max_tokens=1500,
     streaming=True,
+    timeout=30,      # same timeout for streaming
+    max_retries=2,
 )
 
 TOOLS = {
@@ -105,14 +109,17 @@ RULES:
   A stock price lookup should reflect the risk of that stock as an investment.
 - For sources, list only the document filenames actually referenced in the context. If no documents were used, return an empty list.
 - IMPORTANT: If the retrieved context does not contain sufficient information to answer the question confidently, set confidence below 0.6 and do NOT fabricate an answer. It is better to be honest about uncertainty than to generate misleading financial advice.
+- NEVER end your advice with a question or offer to help further. The follow_up field handles that separately.
 
 FOLLOW-UP QUESTIONS RULES:
-- Suggest 3 follow-up questions the USER can ask YOU (the AI) to learn more.
-- Questions must be things the AI can answer, NOT things only the user knows about themselves.
-- Questions must be directly related to the topic just discussed.
-- BAD: "What is my risk tolerance?", "What are your financial goals?", "How much do you earn?"
-- GOOD: "How do I calculate my net worth?", "What are the best ETFs on DFM?", "How does inflation affect savings in the UAE?"
-- Keep questions short, specific, and genuinely useful."""
+- Suggest exactly 3 follow-up questions the user can ask YOU next.
+- Every question MUST be answerable using your tools: doc_search (UAE financial documents), stock_price (live prices), or budget_calc (income/expense calculations).
+- Questions must be factual and specific — not open-ended or conversational.
+- BANNED phrases in questions: "Would you like", "Can you help", "How do I find out", "What should I do", "Tell me more about"
+- BAD: "Would you like help comparing savings products?", "What are your financial goals?"
+- BAD: "How do I find the best bank rate?" (requires external research, not answerable by the agent)
+- GOOD: "How does the UAE Central Bank base rate affect savings account returns?", "What does the CBUAE say about fixed deposit regulations?", "How much would AED 10,000 grow at 5% over 10 years?"
+- The question must be something FinSight can answer RIGHT NOW with its tools and knowledge base."""
 
 STREAMING_PROMPT = """You are FinSight, an AI-powered personal finance advisor for UAE residents.
 
@@ -123,13 +130,21 @@ Do not use markdown headers. Use bold text where helpful.
 Do not add unnecessary preamble. Get straight to the answer.
 
 IMPORTANT: If you do not have reliable information to answer the question, say so clearly and honestly.
-Do NOT fabricate financial data, regulations, or statistics. Financial misinformation causes real harm."""
+Do NOT fabricate financial data, regulations, or statistics. Financial misinformation causes real harm.
+
+CRITICAL: Never end your response with a question. Never write phrases like:
+- "Would you like help with..."
+- "Is this helping you..."
+- "Do you need help understanding..."
+- "Shall I explain..."
+- "Would you like me to..."
+End with your advice or conclusion. The follow-up questions are handled separately."""
 
 FALLBACK_PROMPT = """You are FinSight, an AI-powered personal finance advisor for UAE residents.
 
 A previous attempt to answer the user's question returned a low confidence score, meaning the initial retrieval did not find sufficient information.
 
-You have been given a broader set of retrieved documents as a second attempt. 
+You have been given a broader set of retrieved documents as a second attempt.
 
 RULES:
 - Answer ONLY from the provided context. Do not fabricate.
@@ -265,7 +280,6 @@ def confidence_fallback(question: str, original_tool: str, session_id: str = "")
     """
     cb = _get_callback(session_id)
 
-    # Broaden the query by prepending UAE finance context
     broader_query = f"UAE finance: {question}"
     try:
         fallback_context = doc_search.invoke(broader_query)
@@ -289,7 +303,6 @@ def confidence_fallback(question: str, original_tool: str, session_id: str = "")
         )
 
         if fallback_response.confidence >= CONFIDENCE_THRESHOLD:
-            # Fallback succeeded — return improved answer
             return {
                 "answered": True,
                 "text": fallback_response.advice,
@@ -297,7 +310,6 @@ def confidence_fallback(question: str, original_tool: str, session_id: str = "")
                 "sources": fallback_response.sources,
             }
         else:
-            # Still low confidence — return honest message, don't generate
             return {
                 "answered": False,
                 "text": (

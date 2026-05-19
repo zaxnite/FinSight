@@ -37,6 +37,15 @@ export interface HistoryMessage {
   content: string;
 }
 
+// ── Human-readable error messages ─────────────────────────────────────────────
+function parseHttpError(status: number): string {
+  if (status === 422) return "Please type a message before sending.";
+  if (status === 429) return "Too many requests — please wait a moment before trying again.";
+  if (status === 500) return "FinSight encountered an error. Please try again.";
+  if (status === 0 || status === undefined) return "Cannot reach FinSight. Make sure the backend is running.";
+  return `Unexpected error (${status}). Please try again.`;
+}
+
 export async function streamMessage(
   message: string,
   session_id: string,
@@ -45,6 +54,12 @@ export async function streamMessage(
   onDone: () => void,
   onError: (error: string) => void
 ): Promise<void> {
+  // Client-side empty message guard — catches it before hitting the network
+  if (!message || !message.trim()) {
+    onError("Please type a message before sending.");
+    return;
+  }
+
   try {
     const response = await fetch(`${BASE_URL}/chat/stream`, {
       method: "POST",
@@ -53,7 +68,7 @@ export async function streamMessage(
     });
 
     if (!response.ok) {
-      onError(`HTTP error ${response.status}`);
+      onError(parseHttpError(response.status));
       return;
     }
 
@@ -85,6 +100,11 @@ export async function streamMessage(
     }
     onDone();
   } catch (err) {
+    // Network-level errors (backend down, CORS, timeout)
+    if (err instanceof TypeError && err.message.includes("fetch")) {
+      onError("Cannot reach FinSight. Make sure the backend is running.");
+      return;
+    }
     onError(err instanceof Error ? err.message : "Stream error");
   }
 }
