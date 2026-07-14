@@ -1,5 +1,6 @@
 import sys
 import os
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
@@ -46,10 +47,11 @@ def build_graph() -> StateGraph:
 app = build_graph()
 
 
-def run_graph(message: str, session_id: str) -> AgentOutput:
+def run_graph(message: str, session_id: str, anthropic_key: str = "") -> AgentOutput:
     initial_state = AgentState(
         messages=[HumanMessage(content=message)],
         session_id=session_id,
+        anthropic_key=anthropic_key or os.getenv("ANTHROPIC_API_KEY", ""),
     )
 
     langfuse_config = get_langfuse_config(session_id=session_id)

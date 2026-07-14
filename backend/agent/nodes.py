@@ -17,14 +17,6 @@ from tools.stock_price import stock_price
 from tools.budget_calc import budget_calc
 from observability.langfuse_client import get_callback
 
-llm = ChatAnthropic(
-    model="claude-haiku-4-5-20251001",
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    max_tokens=1500,
-    timeout=30,      # fail after 30s instead of hanging forever
-    max_retries=2,   # auto-retry twice on transient errors
-)
-
 # ── Structured output schemas ─────────────────────────────────────────────────
 class GuardrailDecision(BaseModel):
     is_finance_related: bool = Field(
@@ -42,20 +34,36 @@ class ToolDecision(BaseModel):
         description="The input to pass to the tool, or empty string if tool is none"
     )
 
-# ── Structured LLMs ───────────────────────────────────────────────────────────
-guardrail_llm = llm.with_structured_output(GuardrailDecision)
-reasoner_llm = llm.with_structured_output(ToolDecision)
-responder_llm = llm.with_structured_output(FinanceResponse)
 
-# ── Streaming LLM ─────────────────────────────────────────────────────────────
-streaming_llm = ChatAnthropic(
-    model="claude-haiku-4-5-20251001",
-    api_key=os.getenv("ANTHROPIC_API_KEY"),
-    max_tokens=1500,
-    streaming=True,
-    timeout=30,      # same timeout for streaming
-    max_retries=2,
-)
+# ── LLM factory ───────────────────────────────────────────────────────────────
+# LLMs are created per-request rather than at module load time so that the
+# Anthropic API key can be supplied via the X-Anthropic-Key header when it is
+# not present in the environment.
+
+def _make_llm(anthropic_key: str) -> ChatAnthropic:
+    return ChatAnthropic(
+        model="claude-haiku-4-5-20251001",
+        api_key=anthropic_key,
+        max_tokens=1500,
+        timeout=30,
+        max_retries=2,
+    )
+
+def _make_streaming_llm(anthropic_key: str) -> ChatAnthropic:
+    return ChatAnthropic(
+        model="claude-haiku-4-5-20251001",
+        api_key=anthropic_key,
+        max_tokens=1500,
+        streaming=True,
+        timeout=30,
+        max_retries=2,
+    )
+
+# Convenience wrappers that mirror the old module-level names used by main.py
+def responder_llm(messages: list, anthropic_key: str):
+    """Invoke the structured responder LLM with the given key."""
+    llm = _make_llm(anthropic_key)
+    return llm.with_structured_output(FinanceResponse).invoke(messages)
 
 TOOLS = {
     "doc_search": doc_search,
@@ -176,10 +184,13 @@ def _build_memory_context(state: AgentState) -> list:
 
 
 # ── Nodes ─────────────────────────────────────────────────────────────────────
-def guardrail_node(state: AgentState) -> AgentState:
+def guardrail_node(state: AgentState, anthropic_key: str = "") -> AgentState:
+    anthropic_key = anthropic_key or state.anthropic_key or os.getenv("ANTHROPIC_API_KEY", "")
     user_message = state.messages[-1].content if state.messages else ""
     cb = _get_callback(state.session_id)
 
+    llm = _make_llm(anthropic_key)
+    guardrail_llm = llm.with_structured_output(GuardrailDecision)
     decision: GuardrailDecision = guardrail_llm.invoke(
         [SystemMessage(content=GUARDRAIL_PROMPT), HumanMessage(content=user_message)],
         config={"callbacks": [cb]},
@@ -196,10 +207,13 @@ def guardrail_node(state: AgentState) -> AgentState:
     return state
 
 
-def reasoner_node(state: AgentState) -> AgentState:
+def reasoner_node(state: AgentState, anthropic_key: str = "") -> AgentState:
+    anthropic_key = anthropic_key or state.anthropic_key or os.getenv("ANTHROPIC_API_KEY", "")
     user_message = state.messages[-1].content if state.messages else ""
     cb = _get_callback(state.session_id)
 
+    llm = _make_llm(anthropic_key)
+    reasoner_llm = llm.with_structured_output(ToolDecision)
     decision: ToolDecision = reasoner_llm.invoke(
         [SystemMessage(content=REASONER_PROMPT), HumanMessage(content=user_message)],
         config={"callbacks": [cb]},
@@ -221,7 +235,8 @@ def tool_node(state: AgentState) -> AgentState:
     return state
 
 
-def responder_node(state: AgentState) -> AgentState:
+def responder_node(state: AgentState, anthropic_key: str = "") -> AgentState:
+    anthropic_key = anthropic_key or state.anthropic_key or os.getenv("ANTHROPIC_API_KEY", "")
     user_message = state.messages[-1].content if state.messages else ""
     history = _build_memory_context(state)
     cb = _get_callback(state.session_id)
@@ -236,7 +251,8 @@ def responder_node(state: AgentState) -> AgentState:
     messages.extend(history)
     messages.append(HumanMessage(content=f"User question: {user_message}\n\nContext:\n{context}"))
 
-    response: FinanceResponse = responder_llm.invoke(
+    _responder = _make_llm(anthropic_key).with_structured_output(FinanceResponse)
+    response: FinanceResponse = _responder.invoke(
         messages,
         config={"callbacks": [cb]},
     )
@@ -244,8 +260,9 @@ def responder_node(state: AgentState) -> AgentState:
     return state
 
 
-def stream_responder(state: AgentState, session_id: str = ""):
+def stream_responder(state: AgentState, session_id: str = "", anthropic_key: str = ""):
     """Generator used for /chat/stream endpoint. Yields text chunks with delay for typing effect."""
+    anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY", "")
     user_message = state.messages[-1].content if state.messages else ""
     history = _build_memory_context(state)
     cb = _get_callback(session_id or state.session_id)
@@ -260,6 +277,7 @@ def stream_responder(state: AgentState, session_id: str = ""):
     messages.extend(history)
     messages.append(HumanMessage(content=f"User question: {user_message}\n\nContext:\n{context}"))
 
+    streaming_llm = _make_streaming_llm(anthropic_key)
     for chunk in streaming_llm.stream(messages, config={"callbacks": [cb]}):
         if chunk.content:
             time.sleep(0.015)
@@ -267,7 +285,7 @@ def stream_responder(state: AgentState, session_id: str = ""):
 
 
 # ── Confidence Fallback ───────────────────────────────────────────────────────
-def confidence_fallback(question: str, original_tool: str, session_id: str = "") -> dict:
+def confidence_fallback(question: str, original_tool: str, session_id: str = "", anthropic_key: str = "") -> dict:
     """
     Called when the initial response confidence is below CONFIDENCE_THRESHOLD (0.6).
 
@@ -278,6 +296,7 @@ def confidence_fallback(question: str, original_tool: str, session_id: str = "")
 
     Returns a dict with: answered (bool), text (str), confidence (float), sources (list).
     """
+    anthropic_key = anthropic_key or os.getenv("ANTHROPIC_API_KEY", "")
     cb = _get_callback(session_id)
 
     broader_query = f"UAE finance: {question}"
@@ -297,7 +316,8 @@ def confidence_fallback(question: str, original_tool: str, session_id: str = "")
     ]
 
     try:
-        fallback_response: FinanceResponse = responder_llm.invoke(
+        _responder = _make_llm(anthropic_key).with_structured_output(FinanceResponse)
+        fallback_response: FinanceResponse = _responder.invoke(
             fallback_messages,
             config={"callbacks": [cb]},
         )

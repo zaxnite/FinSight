@@ -3,7 +3,35 @@ import type { AgentOutput } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
+// ── API key helpers ────────────────────────────────────────────────────────────
+const KEY_STORAGE = "finsight_anthropic_key";
+
+export function getStoredApiKey(): string {
+  return localStorage.getItem(KEY_STORAGE) || "";
+}
+
+export function saveApiKey(key: string): void {
+  localStorage.setItem(KEY_STORAGE, key.trim());
+}
+
+export function clearApiKey(): void {
+  localStorage.removeItem(KEY_STORAGE);
+}
+
+/** Returns the headers object with X-Anthropic-Key when a key is stored locally. */
+function authHeaders(): Record<string, string> {
+  const key = getStoredApiKey();
+  return key ? { "X-Anthropic-Key": key } : {};
+}
+
 const api = axios.create({ baseURL: BASE_URL });
+
+// Attach the stored key automatically to every axios request
+api.interceptors.request.use((config) => {
+  const key = getStoredApiKey();
+  if (key) config.headers["X-Anthropic-Key"] = key;
+  return config;
+});
 
 export const sendMessage = async (
   message: string,
@@ -17,6 +45,20 @@ export const checkHealth = async (): Promise<boolean> => {
   try {
     await api.get("/health");
     return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Asks the backend whether it already has an Anthropic key set server-side.
+ * Returns true  → no modal needed (key is in the environment).
+ * Returns false → frontend must ask the user for a key.
+ */
+export const checkApiKeyStatus = async (): Promise<boolean> => {
+  try {
+    const { data } = await api.get<{ has_key: boolean }>("/api-key/status");
+    return data.has_key;
   } catch {
     return false;
   }
@@ -63,7 +105,7 @@ export async function streamMessage(
   try {
     const response = await fetch(`${BASE_URL}/chat/stream`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ message, session_id, history }),
     });
 

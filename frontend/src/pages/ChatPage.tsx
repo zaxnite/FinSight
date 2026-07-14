@@ -2,7 +2,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import { useChat } from "../hooks/useChat";
-import { streamMessage } from "../services/api";
+import { streamMessage, checkApiKeyStatus, getStoredApiKey } from "../services/api";
+import ApiKeyModal from "../components/ApiKeyModal";
 import type { AgentOutput } from "../types";
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
@@ -625,6 +626,19 @@ export default function ChatPage() {
   const [renameModal, setRenameModal] = useState<{ id: string; title: string } | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ id: string; title: string } | null>(null);
 
+  // ── API key gate ─────────────────────────────────────────────────────────────
+  // null = still checking, true = key available, false = show modal
+  const [showKeyModal, setShowKeyModal] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    async function checkKey() {
+      if (getStoredApiKey()) { setShowKeyModal(false); return; }
+      const serverHasKey = await checkApiKeyStatus();
+      setShowKeyModal(!serverHasKey);
+    }
+    checkKey();
+  }, []);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeConversation?.messages, streamingText, isStreaming]);
@@ -759,8 +773,19 @@ const mdComponents: any = {
     h3: ({ children }: { children: React.ReactNode }) => <h3 style={{ fontSize: "14px", fontWeight: 600, margin: "6px 0 4px" }}>{children}</h3>,
   };
 
+  // Still checking key status — don't flash the UI
+  if (showKeyModal === null) return (
+    <div style={{ height: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--bg-base)", color: "var(--accent)", fontFamily: "var(--font-mono)", fontSize: "13px" }}>
+      Loading FinSight...
+    </div>
+  );
+
   return (
     <div style={{ display: "flex", height: "100vh", background: "var(--bg-base)" }}>
+
+      {showKeyModal && (
+        <ApiKeyModal onKeySubmitted={() => setShowKeyModal(false)} />
+      )}
 
       {renameModal && <RenameModal currentTitle={renameModal.title} onConfirm={confirmRename} onClose={() => setRenameModal(null)} />}
       {deleteModal && <DeleteModal title={deleteModal.title} onConfirm={confirmDelete} onClose={() => setDeleteModal(null)} />}

@@ -4,6 +4,21 @@ import LandingPage from "./pages/LandingPage";
 
 const ChatPage = lazy(() => import("./pages/ChatPage"));
 
+const LoadingScreen = (
+  <div style={{
+    height: "100vh",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "var(--bg-base)",
+    color: "var(--accent)",
+    fontFamily: "var(--font-mono)",
+    fontSize: "13px",
+  }}>
+    Loading FinSight...
+  </div>
+);
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -12,20 +27,7 @@ export default function App() {
         <Route
           path="/chat"
           element={
-            <Suspense fallback={
-              <div style={{
-                height: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "var(--bg-base)",
-                color: "var(--accent)",
-                fontFamily: "var(--font-mono)",
-                fontSize: "13px",
-              }}>
-                Loading FinSight...
-              </div>
-            }>
+            <Suspense fallback={LoadingScreen}>
               <ChatPage />
             </Suspense>
           }

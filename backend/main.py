@@ -6,8 +6,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── Startup env var check — fail fast with a clear message ────────────────────
+# ANTHROPIC_API_KEY is intentionally excluded here — it can be supplied
+# per-request via the X-Anthropic-Key header when not set in the environment.
 REQUIRED_ENV_VARS = [
-    "ANTHROPIC_API_KEY",
     "OPENAI_API_KEY",
     "PINECONE_API_KEY",
     "LANGFUSE_PUBLIC_KEY",
@@ -19,6 +20,9 @@ if missing:
         f"Missing required environment variables: {', '.join(missing)}\n"
         f"Check your .env file and make sure all keys are set."
     )
+
+if not os.getenv("ANTHROPIC_API_KEY"):
+    print("[FinSight] ANTHROPIC_API_KEY not set in environment — clients must supply it via X-Anthropic-Key header.")
 
 import uuid
 import json
@@ -121,7 +125,28 @@ def validate_message(message: str) -> None:
         )
 
 
+def resolve_anthropic_key(request: Request) -> str:
+    """
+    Returns the Anthropic API key to use for this request.
+    Priority: env var > X-Anthropic-Key header.
+    Raises 401 if neither is available.
+    """
+    key = os.getenv("ANTHROPIC_API_KEY") or request.headers.get("X-Anthropic-Key", "").strip()
+    if not key:
+        raise HTTPException(
+            status_code=401,
+            detail="No Anthropic API key available. Please provide one via the X-Anthropic-Key header.",
+        )
+    return key
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+@app.get("/api-key/status")
+def api_key_status():
+    """Tells the frontend whether the server already has an Anthropic key set."""
+    return {"has_key": bool(os.getenv("ANTHROPIC_API_KEY"))}
+
+
 @app.get("/health")
 def health():
     uptime_seconds = int(time.time() - START_TIME)
@@ -162,9 +187,10 @@ def score(request: Request, body: ScoreRequest):
 @limiter.limit("10/minute")
 def chat(request: Request, body: ChatRequest):
     validate_message(body.message)
+    anthropic_key = resolve_anthropic_key(request)
     try:
         session_id = body.session_id or str(uuid.uuid4())
-        result = run_graph(message=body.message, session_id=session_id)
+        result = run_graph(message=body.message, session_id=session_id, anthropic_key=anthropic_key)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -174,6 +200,7 @@ def chat(request: Request, body: ChatRequest):
 @limiter.limit("10/minute")
 async def chat_stream(request: Request, body: ChatRequest):
     validate_message(body.message)
+    anthropic_key = resolve_anthropic_key(request)
 
     session_id = body.session_id or str(uuid.uuid4())
 
@@ -194,7 +221,7 @@ async def chat_stream(request: Request, body: ChatRequest):
             state = AgentState(messages=messages, session_id=session_id)
 
             # ── Guardrail ─────────────────────────────────────────────────────
-            state = guardrail_node(state)
+            state = guardrail_node(state, anthropic_key=anthropic_key)
 
             if state.blocked:
                 yield f"data: {json.dumps({'type': 'text', 'content': state.blocked_message})}\n\n"
@@ -208,7 +235,7 @@ async def chat_stream(request: Request, body: ChatRequest):
                 return
 
             # ── Reasoner + Tool ───────────────────────────────────────────────
-            state = reasoner_node(state)
+            state = reasoner_node(state, anthropic_key=anthropic_key)
             state = tool_node(state)
             tool_used = state.tool_to_use
 
@@ -216,7 +243,7 @@ async def chat_stream(request: Request, body: ChatRequest):
 
             # ── Stream response ───────────────────────────────────────────────
             try:
-                for chunk in stream_responder(state, session_id=session_id):
+                for chunk in stream_responder(state, session_id=session_id, anthropic_key=anthropic_key):
                     full_text += chunk
                     yield f"data: {json.dumps({'type': 'text', 'content': chunk})}\n\n"
             except Exception as e:
@@ -239,7 +266,7 @@ async def chat_stream(request: Request, body: ChatRequest):
                         f"Now provide ONLY the metadata: confidence score, risk level, sources, and follow-up questions. Do not repeat the advice."
                     )),
                 ]
-                meta = responder_llm.invoke(meta_messages)
+                meta = responder_llm(meta_messages, anthropic_key=anthropic_key)
 
                 if meta.confidence < 0.6:
                     fallback_result = confidence_fallback(
