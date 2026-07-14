@@ -385,7 +385,7 @@ export default function LandingPage() {
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
           {[
-            { delay: 0, icon: <IconSearch />, title: "RAG Pipeline", accent: "#00D084", desc: "1,733 chunks from 8 UAE financial documents indexed in Pinecone. Semantic search retrieves the most relevant context for every question." },
+            { delay: 0, icon: <IconSearch />, title: "RAG Pipeline", accent: "#00D084", desc: "2,994 chunks from 12 UAE financial documents indexed in Pinecone. Semantic search retrieves the most relevant context for every question." },
             { delay: 100, icon: <IconTrendingUp />, title: "Live Market Data", accent: "#00B8D9", desc: "Real-time stock and crypto prices via yfinance. Ask about AAPL, BTC-USD, or any ticker. The agent fetches live data instantly." },
             { delay: 200, icon: <IconCalculator />, title: "Budget Calculator", accent: "#00D084", desc: "Enter your income and expenses to get a personalised 50/30/20 budget breakdown with AED figures and savings gap analysis." },
             { delay: 300, icon: <IconActivity />, title: "LangFuse Observability", accent: "#00B8D9", desc: "Every Claude call is traced end-to-end. Token usage, latency, tool routing, and confidence scores are logged to a live dashboard." },
