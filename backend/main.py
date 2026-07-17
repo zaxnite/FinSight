@@ -152,6 +152,27 @@ def api_key_status():
     return {"has_key": bool(os.getenv("ANTHROPIC_API_KEY"))}
 
 
+class ValidateKeyRequest(BaseModel):
+    api_key: str
+
+
+@app.post("/api-key/validate")
+def validate_api_key(body: ValidateKeyRequest):
+    """Validates an Anthropic API key by making a lightweight test request."""
+    import anthropic as _anthropic
+    key = body.api_key.strip()
+    if not key.startswith("sk-ant-"):
+        return {"valid": False, "error": "Invalid key format — Anthropic keys start with sk-ant-"}
+    try:
+        client = _anthropic.Anthropic(api_key=key)
+        client.models.list(limit=1)
+        return {"valid": True}
+    except _anthropic.AuthenticationError:
+        return {"valid": False, "error": "Invalid API key — authentication failed."}
+    except Exception as e:
+        return {"valid": False, "error": f"Validation error: {str(e)}"}
+
+
 @app.get("/health")
 def health():
     uptime_seconds = int(time.time() - START_TIME)
