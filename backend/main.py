@@ -94,6 +94,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
+        "https://finsight-1-twnc.onrender.com",
         os.getenv("FRONTEND_URL", ""),
     ],
     allow_credentials=True,
